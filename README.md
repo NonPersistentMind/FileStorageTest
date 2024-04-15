@@ -11,7 +11,7 @@ This project is a FastAPI application for storing files and generating Excel rep
 ### Installation Steps
 1. Clone the repository:
     ```
-    git clone https://github.com/NonPersistentMind/FileStorageTest
+    [git clone https://github.com/NonPersistentMind/FileStorageTest](https://github.com/NonPersistentMind/FileStorageTest.git)
     ```
 2. Navigate to the project directory:
     ```
