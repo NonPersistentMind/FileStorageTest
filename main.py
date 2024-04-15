@@ -2,7 +2,6 @@ import os, asyncpg, typing as t, urllib
 import urllib.parse
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse, FileResponse, Response, StreamingResponse
-# from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from openpyxl import Workbook as Workbook
 from openpyxl.utils import get_column_letter
@@ -30,9 +29,12 @@ app.add_event_handler("startup", startup_event)
 app.add_event_handler("shutdown", shutdown_event)
         
 
+@app.post("/files")
 @app.post("/files/{dir_name}")
-async def upload_file_to_directory(dir_name: str, file: UploadFile = File(...)):
+async def upload_file_to_directory(dir_name: str = None, file: UploadFile = File(...)):
     try:
+        dir_name = dir_name.strip() if dir_name else "."
+        
         file_path: Path = DATA_FOLDER / dir_name / file.filename
         file_path.parent.mkdir(parents=False, exist_ok=True)
         
@@ -43,26 +45,6 @@ async def upload_file_to_directory(dir_name: str, file: UploadFile = File(...)):
             file_id = await u.save_file_to_db(
                 connection,
                 dir_name,
-                file.filename,
-                bytes_written
-            )
-        return JSONResponse(content={"file_id": file_id}, status_code=201)
-    except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
-
-
-@app.post("/files")
-async def upload_file(file: UploadFile = File(...)):
-    try:
-        file_path: Path = DATA_FOLDER / file.filename
-        
-        with open(file_path, "w+b") as f:
-            bytes_written: int = f.write(await file.read())
-
-        async with pool.acquire() as connection:
-            file_id = await u.save_file_to_db(
-                connection, 
-                ".", # Save file to root directory
                 file.filename,
                 bytes_written
             )
@@ -106,8 +88,8 @@ async def get_file_info_head(file_id: int):
     headers = {
         "Content-Length": str(file_size),
         "Content-Disposition": f"attachment; filename={urllib.parse.quote(file_name.encode('utf-8'))}",
-        "X-File-Size": str(file_size),
-        "X-Updated-At": updated_at.isoformat()
+        "Last-Modified": updated_at.strftime("%a, %d %b %Y %H:%M:%S GMT") # Format the date according to RFC 7232
+        
     }
 
     return Response(headers=headers)
@@ -146,7 +128,7 @@ async def generate_report(file_id: int):
     file_data: str = file_path.read_text()
     try:
         rows = file_data.strip().split("\n")
-        operations = rows[-1].split()[1:]  # Extract operation from the last row
+        operations = rows[-1].split()[1:]  # Extract operations from the last row
         input_data = [row.split()[1:] for row in rows[:-1]]  # Extract input data from all but the last row
 
         wb = Workbook()
